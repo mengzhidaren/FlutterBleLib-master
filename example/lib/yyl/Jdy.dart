@@ -1,5 +1,7 @@
 library utils_jdy;
 
+import 'dart:convert';
+
 class JDY {
   static final serviceUUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
   static final characteristicUUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
@@ -40,16 +42,48 @@ class JDY {
     return connectData;
   }
 
-  List<int> sendMts(int speed, int flow, int mode) {
-    checkNumb(speed, 0, 20);
-    checkNumb(flow, 0, 20);
-    checkNumb(mode, 1, 2);
+  List<int> sendMts(MtsData mtsData) {
+    checkNumb(mtsData.speed, 0, 20);
+    checkNumb(mtsData.flow, 0, 20);
+    checkNumb(mtsData.mode, 1, 2);
     connectData[controlIndex] = 0x17;
     connectData[controlTime] = 0xff;
-    connectData[7] = speed;
-    connectData[8] = flow;
-    connectData[9] = mode;
+    connectData[7] = mtsData.speed;
+    connectData[8] = mtsData.flow;
+    connectData[9] = mtsData.mode;
     return connectData;
+  }
+}
+
+class MtsData {
+  int code = 0;
+  int speed = 1;
+  int flow = 1;
+  int mode = 1;
+  int machine = 0;
+  int handle = 1;
+
+  void setResult(String result) {
+    if (result == null || result.length < 20) return;
+    final data = base64Decode(result);
+    code = data[3];
+    speed = data[7];
+    flow = data[8];
+    machine = data[10];
+    handle = data[11];
+  }
+
+  String getMachineState() {
+    var state = "";
+    switch (machine) {
+      case 1:
+        state = "";
+        break;
+      case 2:
+        state = "";
+        break;
+    }
+    return state;
   }
 }
 

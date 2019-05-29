@@ -9,7 +9,6 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
-
 import android.util.Base64;
 import android.util.Log;
 import android.util.SparseArray;
@@ -39,8 +38,8 @@ import com.polidea.rxandroidble2.exceptions.BleCharacteristicNotFoundException;
 import com.polidea.rxandroidble2.internal.RxBleLog;
 import com.polidea.rxandroidble2.scan.ScanResult;
 
-
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,11 +47,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import io.reactivex.Observable;
 import io.reactivex.ObservableSource;
-import io.reactivex.Observer;
-import io.reactivex.SingleObserver;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Action;
-import io.reactivex.functions.BiConsumer;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 
@@ -274,11 +270,17 @@ public class BleHelper {
                             safeAction.onError(new Throwable("Reject"));
                             transactions.removeTransactionSubscription(transactionId);
                         }
-                    }).subscribe(new Consumer<Integer>() {
+                    }).flatMapObservable(new Function<Integer, ObservableSource<Integer>>() {
+                        @Override
+                        public ObservableSource<Integer> apply(Integer integer) throws Exception {
+                            return Observable.just(integer);
+                        }
+                    })
+                    .subscribe(new Consumer<Integer>() {
                         @Override
                         public void accept(Integer integer) throws Exception {
                             safeAction.onSuccess(converter.convertToBleDeviceMessage(device.getRxBleDevice(), integer, NO_VALUE));
-                            transactions.removeTransactionSubscription(transactionId);
+
                         }
                     }, new Consumer<Throwable>() {
                         @Override
@@ -286,7 +288,13 @@ public class BleHelper {
                             safeAction.onError(throwable);
                             transactions.removeTransactionSubscription(transactionId);
                         }
+                    }, new Action() {
+                        @Override
+                        public void run() {
+                            transactions.removeTransactionSubscription(transactionId);
+                        }
                     });
+
             transactions.replaceTransactionSubscription(transactionId, subscription);
         } else {
             successAction.onSuccess(converter.convertToBleDeviceMessage(device.getRxBleDevice(), connection.getMtu(), NO_VALUE));
@@ -317,16 +325,25 @@ public class BleHelper {
                         safeAction.onError(new Throwable("Reject"));
                         transactions.removeTransactionSubscription(transactionId);
                     }
+                }).flatMapObservable(new Function<Integer, ObservableSource<Integer>>() {
+                    @Override
+                    public ObservableSource<Integer> apply(Integer integer) throws Exception {
+                        return Observable.just(integer);
+                    }
                 }).subscribe(new Consumer<Integer>() {
                     @Override
                     public void accept(Integer rssi) throws Exception {
                         safeAction.onSuccess(converter.convertToBleDeviceMessage(device.getRxBleDevice(), NO_VALUE, rssi));
-                        transactions.removeTransactionSubscription(transactionId);
                     }
                 }, new Consumer<Throwable>() {
                     @Override
                     public void accept(Throwable throwable) throws Exception {
                         safeAction.onError(throwable);
+                        transactions.removeTransactionSubscription(transactionId);
+                    }
+                }, new Action() {
+                    @Override
+                    public void run() {
                         transactions.removeTransactionSubscription(transactionId);
                     }
                 });
@@ -455,16 +472,10 @@ public class BleHelper {
             return;
         }
 
-        connection
-                .discoverServices()
-                .subscribe(new SingleObserver<RxBleDeviceServices>() {
+        final Disposable subscription = connection.discoverServices()
+                .subscribe(new Consumer<RxBleDeviceServices>() {
                     @Override
-                    public void onSubscribe(Disposable d) {
-
-                    }
-
-                    @Override
-                    public void onSuccess(RxBleDeviceServices rxBleDeviceServices) {
+                    public void accept(RxBleDeviceServices rxBleDeviceServices) throws Exception {
                         ArrayList<Service> services = new ArrayList<>();
                         for (BluetoothGattService gattService : rxBleDeviceServices.getBluetoothGattServices()) {
                             Service service = new Service(device, gattService);
@@ -479,13 +490,12 @@ public class BleHelper {
                         device.setServices(services);
                         safeAction.onSuccess(converter.convertToBleDeviceMessage(device));
                     }
-
+                }, new Consumer<Throwable>() {
                     @Override
-                    public void onError(Throwable e) {
+                    public void accept(Throwable e) throws Exception {
                         safeAction.onError(e);
                     }
                 });
-
     }
 
 
@@ -682,13 +692,17 @@ public class BleHelper {
                         safeAction.onError(new Throwable("Canceled"));
                         transactions.removeTransactionSubscription(transactionId);
                     }
+                }).flatMapObservable(new Function<byte[], ObservableSource<byte[]>>() {
+                    @Override
+                    public ObservableSource<byte[]> apply(byte[] bytes) throws Exception {
+                        return Observable.just(bytes);
+                    }
                 })
                 .subscribe(new Consumer<byte[]>() {
                     @Override
                     public void accept(byte[] bytes) throws Exception {
                         characteristic.logValue("Write to", bytes);
                         safeAction.onSuccess(converter.convertToBleCharacteristicMessage(characteristic, bytes));
-                        transactions.removeTransactionSubscription(transactionId);
                     }
                 }, new Consumer<Throwable>() {
                     @Override
@@ -702,6 +716,11 @@ public class BleHelper {
                             return;
                         }
                         safeAction.onError(e);
+                        transactions.removeTransactionSubscription(transactionId);
+                    }
+                },new Action(){
+                    @Override
+                    public void run() {
                         transactions.removeTransactionSubscription(transactionId);
                     }
                 });
@@ -769,12 +788,18 @@ public class BleHelper {
                         safeAction.onError(new Throwable("Canceled"));
                         transactions.removeTransactionSubscription(transactionId);
                     }
-                }).subscribe(new Consumer<byte[]>() {
+                }).flatMapObservable(new Function<byte[], ObservableSource<byte[]>>() {
+                    @Override
+                    public ObservableSource<byte[]> apply(byte[] bytes) throws Exception {
+                        return Observable.just(bytes);
+                    }
+                })
+                .subscribe(new Consumer<byte[]>() {
                     @Override
                     public void accept(byte[] bytes) throws Exception {
                         characteristic.logValue("Read from", bytes);
                         safeAction.onSuccess(converter.convertToBleCharacteristicMessage(characteristic, bytes));
-                        transactions.removeTransactionSubscription(transactionId);
+
                     }
                 }, new Consumer<Throwable>() {
                     @Override
@@ -787,6 +812,11 @@ public class BleHelper {
                             return;
                         }
                         safeAction.onError(e);
+                        transactions.removeTransactionSubscription(transactionId);
+                    }
+                },new Action(){
+                    @Override
+                    public void run() {
                         transactions.removeTransactionSubscription(transactionId);
                     }
                 });
@@ -850,7 +880,7 @@ public class BleHelper {
         final int properties = gattCharacteristic.getProperties();
         final boolean notifications = (properties & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0;
         final boolean indications = (properties & BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0;
-        Log.i("yyl","properties="+properties+"  notifications="+notifications+"  indications="+indications);
+        Log.i("yyl", "properties=" + properties + "  notifications=" + notifications + "  indications=" + indications);
         final Disposable subscription = Observable.just(connection)
                 .flatMap(new Function<RxBleConnection, Observable<Observable<byte[]>>>() {
                     @Override
@@ -869,7 +899,7 @@ public class BleHelper {
                         BluetoothGattDescriptor cccDescriptor =
                                 gattCharacteristic.getDescriptor(Characteristic.CLIENT_CHARACTERISTIC_CONFIG_UUID);
                         if (cccDescriptor == null) {
-                            Log.i("yyl"," getDescriptor  cccDescriptor=null");
+                            Log.i("yyl", " getDescriptor  cccDescriptor=null");
                             return observable;
                         } else {
 
@@ -877,11 +907,13 @@ public class BleHelper {
                                     ? BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                                     : BluetoothGattDescriptor.ENABLE_INDICATION_VALUE;
 
-                            Log.i("yyl","connection  writeDescriptor  enableValue=");
+                            Log.i("yyl", "connection  writeDescriptor  enableValue="+ Arrays.toString(enableValue));
 //---------------------------------------------这里有点问题没看明白------------------------------------------------------------------------------------
                             // Keep in mind that every subscription to this observable will initiate another descriptor write
 //                            return observable.mergeWith(connection.writeDescriptor(cccDescriptor, enableValue).ignoreElements());
                             return observable.mergeWith(connection.writeDescriptor(cccDescriptor, enableValue));
+                            //mergeWith 将此发布者和另一个发布者展平为单个发布者，无需任何转换,就是将两个Flowable观察源合并成一个
+                            //Flowable.just(10,20).mergeWith(Flowable.just(1,2)) = print: 10,20,1,2
                         }
                     }
                 })
@@ -900,7 +932,6 @@ public class BleHelper {
                                 .setCharacteristicMessage(converter.convertToBleCharacteristicMessage(characteristic, bytes))
                                 .build();
                         sendEvent(Event.ReadEvent, monitorCharacteristicMessage);
-
                     }
                 }, new Consumer<Throwable>() {
                     @Override

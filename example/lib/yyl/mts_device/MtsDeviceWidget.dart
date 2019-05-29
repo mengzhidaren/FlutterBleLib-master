@@ -29,9 +29,9 @@ class MtsDeviceWidgetState extends State<MtsDeviceWidget> {
     mtsDevice = MtsDevice(_macAddress);
     mtsDevice.refreshUI = () => setState(() {
           isConnectState = mtsDevice.isConnectState;
-          speed = mtsDevice.speed.toDouble();
-          flow = mtsDevice.flow.toDouble();
-          modeState = mtsDevice.mode == 1;
+          speed = mtsDevice.mtsData.speed.toDouble();
+          flow = mtsDevice.mtsData.flow.toDouble();
+          modeState = mtsDevice.mtsData.mode == 1;
         });
   }
 

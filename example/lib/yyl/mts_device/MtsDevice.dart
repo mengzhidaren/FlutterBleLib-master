@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:flutter_ble_lib_example/yyl/Jdy.dart';
 
@@ -5,6 +7,11 @@ class MtsDevice {
   static final Map<String, MtsDevice> _cache = <String, MtsDevice>{};
   final serviceUUID = JDY.serviceUUID;
   final characteristicUUID = JDY.characteristicUUID;
+
+  //蓝牙反应有点慢 等1秒在操作
+  final _oneSecond = Duration(seconds: 1);
+
+  MtsDevice._internal(this._macAddress);
 
   factory MtsDevice(String macAddress) {
     if (_cache.containsKey(macAddress)) {
@@ -16,19 +23,11 @@ class MtsDevice {
     }
   }
 
-  MtsDevice._internal(this._macAddress);
-
   String _macAddress;
-  bool isConnectState = false;
-
-  //蓝牙反应有点慢 等1秒在操作
-  final _oneSecond = Duration(seconds: 1);
+  var isConnectState = false;
   final control = JDY();
   dynamic refreshUI;
-
-  var flow = 1;
-  var speed = 1;
-  var mode = 1;
+  final mtsData = MtsData();
 
   void refreshState() {
     if (refreshUI != null) refreshUI();
@@ -43,18 +42,18 @@ class MtsDevice {
   }
 
   void setSpeed(int speed) {
-    this.speed = speed;
-    _sendBleEvent(control.sendMts(speed, flow, mode), "sendMts");
+    mtsData.speed = speed;
+    _sendBleEvent(control.sendMts(mtsData), "setSpeed");
   }
 
   void setSlow(int flow) {
-    this.flow = flow;
-    _sendBleEvent(control.sendMts(speed, flow, mode), "sendMts");
+    mtsData.flow = flow;
+    _sendBleEvent(control.sendMts(mtsData), "setSlow");
   }
 
   void setMode(int mode) {
-    this.mode = mode;
-    _sendBleEvent(control.sendMts(speed, flow, mode), "sendMts");
+    mtsData.mode = mode;
+    _sendBleEvent(control.sendMts(mtsData), "setMode");
   }
 
   void _sendBleEvent(dynamic eventArray, String eventID) {
@@ -158,6 +157,7 @@ class MtsDevice {
     }
   }
 
+  ///监听蓝牙连接
   void stateChange() {
     FlutterBleLib.instance.onDeviceConnectionChanged().listen((bleDevice) {
       print("isconnect${bleDevice.isConnected}");
@@ -168,23 +168,35 @@ class MtsDevice {
     });
   }
 
-  void _monitorCharacter2(int characteristicIdentifier) {}
-
+  ///监听蓝牙手柄通知回调
   void _monitorCharacter() {
     FlutterBleLib.instance
         .monitorCharacteristicForDevice(
-            _macAddress, serviceUUID, characteristicUUID, monitorEvent)
+            _macAddress, serviceUUID, characteristicUUID, monitorEvent())
         .listen((event) {
+      if (event.transactionId == monitorEvent()) {
+        _setResponse(event.characteristic.value);
+      }
       print(
-          "event=${event.transactionId}  \n value=${event.characteristic.value}");
+          "蓝牙手柄通知回调 event=${event.transactionId} value=${event.characteristic.value}");
     }).onError((e) {
       print("error monitorCharacter " + e.toString());
     });
   }
 
-  final monitorEvent = "characterEvent";
+  void debugLog() {
+    FlutterBleLib.instance.setLogLevel(LogLevel.VERBOSE);
+  }
+
+  void _setResponse(String result) {
+    mtsData.setResult(result);
+    refreshState();
+  }
+
+  ///操作事件ID    订阅事件和取消事件时用到
+  monitorEvent() => 'Mts_$_macAddress';
 
   void clear() {
-    //  FlutterBleLib.instance.cancelTransaction(monitorEvent);
+    FlutterBleLib.instance.cancelTransaction(monitorEvent());
   }
 }

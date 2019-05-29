@@ -31,10 +31,10 @@ public class MainActivity extends FlutterFragmentActivity {
             bluetoothAdapter.enable();
         }
         new RxPermissions(this)
-                .request(Manifest.permission.BLUETOOTH,
-                        Manifest.permission.BLUETOOTH_ADMIN,
+                .request(
                         Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION)
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                )
                 .subscribe(granted -> {
                     if (granted) {
                         Log.i("yyl", "checkPermissions  true");
